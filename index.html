@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CzasPlugin - Zarządzanie Komendami</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #4CAF50;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .status-value {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .status-enabled {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-disabled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-time {
+            background: #cce5ff;
+            color: #004085;
+            font-family: monospace;
+        }
+
+        .content-area {
+            padding: 30px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            width: 24px;
+            height: 24px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .commands-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .command-item {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .command-item:hover {
+            border-color: #4CAF50;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.15);
+        }
+
+        .command-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .command-time {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        .command-status {
+            display: flex;
+            gap: 10px;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .badge-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-executed {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .command-text {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            word-break: break-all;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .command-text::before {
+            content: '$ ';
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .command-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-test {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-test:hover {
+            background: #138496;
+        }
+
+        .btn-edit {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-edit:hover {
+            background: #e0a800;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .add-command-form {
+            display: grid;
+            grid-template-columns: 120px 200px 1fr auto;
+            gap: 15px;
+            align-items: end;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+
+        .form-input {
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .time-input {
+            font-family: monospace;
+        }
+
+        .command-input {
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-top: 4px solid #4CAF50;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .logs-section {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .log-time {
+            color: #4CAF50;
+        }
+
+        .log-level-info {
+            color: #3498db;
+        }
+
+        .log-level-warn {
+            color: #f39c12;
+        }
+
+        .log-level-error {
+            color: #e74c3c;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .add-command-form {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🕐 CzasPlugin Manager</h1>
+            <p>Zaawansowane zarządzanie komendami czasowymi dla Minecraft</p>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="status-card">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">📊 Status Pluginu</h3>
+                    <div class="status-item">
+                        <span class="status-label">Plugin:</span>
+                        <span id="plugin-status" class="status-value status-enabled">WŁĄCZONY</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Aktualny czas:</span>
+                        <span id="current-time" class="status-value status-time">--:--:--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Język:</span>
+                        <span id="language" class="status-value">PL</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Aktywne komendy:</span>
+                        <span id="active-commands" class="status-value">0</span>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="grid-template-columns: 1fr;">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-commands">0</div>
+                        <div class="stat-label">Wszystkich komend</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="executed-today">0</div>
+                        <div class="stat-label">Wykonano dzisiaj</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div class="section">
+                    <h2>
+                        <span class="section-icon">⚡</span>
+                        Zaplanowane Komendy
+                    </h2>
+                    
+                    <div class="add-command-form">
+                        <div class="form-group">
+                            <label class="form-label">Godzina</label>
+                            <input type="time" id="new-time" class="form-input time-input" value="22:45">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status</label>
+                            <select id="new-status" class="form-input">
+                                <option value="active">Aktywna</option>
+                                <option value="inactive">Nieaktywna</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Komenda</label>
+                            <input type="text" id="new-command" class="form-input command-input" placeholder="np. say Witaj świecie!">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="addCommand()">+ Dodaj Komendę</button>
+                        </div>
+                    </div>
+
+                    <div id="commands-container" class="commands-grid" style="margin-top: 30px;">
+                        <!-- Komendy będą tutaj dynamicznie dodawane -->
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>
+                        <span class="section-icon">📋</span>
+                        Logi Pluginu
+                    </h2>
+                    <div class="logs-section" id="logs-container">
+                        <!-- Logi będą tutaj dodawane -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Symulacja danych dla przykładu
+        let commands = [
+            {
+                id: 1,
+                time: "22:45",
+                command: "say Dobranoc wszystkim! Serwer będzie niedostępny przez 5 minut.",
+                status: "active",
+                executed: false,
+                lastExecuted: null
+            },
+            {
+                id: 2,
+                time: "12:00",
+                command: "broadcast Południe! Czas na przerwę obiadową!",
+                status: "active",
+                executed: true,
+                lastExecuted: "2024-01-15 12:00:00"
+            },
+            {
+                id: 3,
+                time: "06:00",
+                command: "weather clear",
+                status: "active",
+                executed: true,
+                lastExecuted: "2024-01-15 06:00:00"
+            },
+            {
+                id: 4,
+                time: "18:00",
+                command: "say Wieczorna aktualizacja serwera za 30 minut!",
+                status: "inactive",
+                executed: false,
+                lastExecuted: null
+            },
+            {
+                id: 5,
+                time: "00:00",
+                command: "save-all",
+                status: "active",
+                executed: true,
+                lastExecuted: "2024-01-15 00:00:00"
+            },
+            {
+                id: 6,
+                time: "03:00",
+                command: "restart",
+                status: "inactive",
+                executed: false,
+                lastExecuted: null
+            }
+        ];
+
+        let logs = [
+            { time: "2024-01-15 22:45:00", level: "info", message: "Wykonuję komendę: say Dobranoc wszystkim!" },
+            { time: "2024-01-15 12:00:00", level: "info", message: "Wykonuję komendę: broadcast Południe!" },
+            { time: "2024-01-15 06:00:00", level: "info", message: "Wykonuję komendę: weather clear" },
+            { time: "2024-01-14 22:45:00", level: "info", message: "Reset wykonany o północy" },
+            { time: "2024-01-14 18:30:00", level: "warn", message: "Komenda nieaktywna: restart" }
+        ];
+
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pl-PL');
+            document.getElementById('current-time').textContent = timeString;
+        }
+
+        function updateStats() {
+            const totalCommands = commands.length;
+            const activeCommands = commands.filter(cmd => cmd.status === 'active').length;
+            const executedToday = commands.filter(cmd => cmd.executed).length;
+
+            document.getElementById('total-commands').textContent = totalCommands;
+            document.getElementById('active-commands').textContent = activeCommands;
+            document.getElementById('executed-today').textContent = executedToday;
+        }
+
+        function renderCommands() {
+            const container = document.getElementById('commands-container');
+            
+            if (commands.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <h3>Brak zaplanowanych komend</h3>
+                        <p>Dodaj pierwszą komendę używając formularza powyżej</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = commands.map(cmd => `
+                <div class="command-item ${cmd.status === 'active' ? 'pulse' : ''}" id="command-${cmd.id}">
+                    <div class="command-header">
+                        <div class="command-time">${cmd.time}</div>
+                        <div class="command-status">
+                            <span class="status-badge ${cmd.status === 'active' ? 'badge-active' : 'badge-inactive'}">
+                                ${cmd.status === 'active' ? 'AKTYWNA' : 'NIEAKTYWNA'}
+                            </span>
+                            ${cmd.executed ? '<span class="status-badge badge-executed">WYKONANO</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="command-text">${cmd.command}</div>
+                    ${cmd.lastExecuted ? `<div style="font-size: 0.8rem; color: #6c757d; margin-bottom: 10px;">Ostatnie wykonanie: ${cmd.lastExecuted}</div>` : ''}
+                    <div class="command-actions">
+                        <button class="btn btn-test" onclick="testCommand(${cmd.id})">🧪 Test</button>
+                        <button class="btn btn-edit" onclick="editCommand(${cmd.id})">✏️ Edytuj</button>
+                        <button class="btn" onclick="toggleCommand(${cmd.id})" style="background: ${cmd.status === 'active' ? '#dc3545' : '#28a745'}; color: white;">
+                            ${cmd.status === 'active' ? '⏸️ Wyłącz' : '▶️ Włącz'}
+                        </button>
+                        <button class="btn btn-delete" onclick="deleteCommand(${cmd.id})">🗑️ Usuń</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            container.innerHTML = logs.map(log => `
+                <div class="log-entry">
+                    <span class="log-time">[${log.time}]</span>
+                    <span class="log-level-${log.level}">[${log.level.toUpperCase()}]</span>
+                    ${log.message}
+                </div>
+            `).join('');
+        }
+
+        function addCommand() {
+            const time = document.getElementById('new-time').value;
+            const command = document.getElementById('new-command').value.trim();
+            const status = document.getElementById('new-status').value;
+
+            if (!time || !command) {
+                alert('Wypełnij wszystkie pola!');
+                return;
+            }
+
+            const newCommand = {
+                id: Date.now(),
+                time: time,
+                command: command,
+                status: status,
+                executed: false,
+                lastExecuted: null
+            };
+
+            commands.push(newCommand);
+            
+            // Reset formularza
+            document.getElementById('new-command').value = '';
+            document.getElementById('new-time').value = '22:45';
+            document.getElementById('new-status').value = 'active';
+
+            // Dodaj log
+            addLog('info', `Dodano nową komendę: ${command} (${time})`);
+
+            updateStats();
+            renderCommands();
+        }
+
+        function testCommand(id) {
+            const command = commands.find(cmd => cmd.id === id);
+            if (command) {
+                addLog('info', `[TEST] Wykonuję komendę: ${command.command}`);
+                alert(`Test komendy:\n${command.command}\n\nKomenda zostałaby wykonana o godzinie ${command.time}`);
+            }
+        }
+
+        function editCommand(id) {
+            const command = commands.find(cmd => cmd.id === id);
+            if (command) {
+                const newCommand = prompt('Edytuj komendę:', command.command);
+                const newTime = prompt('Edytuj godzinę (HH:MM):', command.time);
+                
+                if (newCommand !== null && newTime !== null) {
+                    command.command = newCommand.trim();
+                    command.time = newTime.trim();
+                    addLog('info', `Zaktualizowano komendę ID:${id}`);
+                    renderCommands();
+                }
+            }
+        }
+
+        function toggleCommand(id) {
+            const command = commands.find(cmd => cmd.id === id);
+            if (command) {
+                command.status = command.status === 'active' ? 'inactive' : 'active';
+                addLog('info', `Komenda ID:${id} ${command.status === 'active' ? 'włączona' : 'wyłączona'}`);
+                updateStats();
+                renderCommands();
+            }
+        }
+
+        function deleteCommand(id) {
+            if (confirm('Czy na pewno chcesz usunąć tę komendę?')) {
+                const index = commands.findIndex(cmd => cmd.id === id);
+                if (index !== -1) {
+                    const command = commands[index];
+                    commands.splice(index, 1);
+                    addLog('warn', `Usunięto komendę: ${command.command}`);
+                    updateStats();
+                    renderCommands();
+                }
+            }
+        }
+
+        function addLog(level, message) {
+            const now = new Date();
+            const timeString = now.toISOString().slice(0, 19).replace('T', ' ');
+            logs.unshift({ time: timeString, level: level, message: message });
+            
+            // Zachowaj tylko ostatnie 50 logów
+            if (logs.length > 50) {
+                logs = logs.slice(0, 50);
+            }
+            
+            renderLogs();
+        }
+
+        // Symulacja wykonywania komend w czasie rzeczywistym
+        function simulateExecution() {
+            const now = new Date();
+            const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+            
+            commands.forEach(cmd => {
+                if (cmd.status === 'active' && cmd.time === currentTime && !cmd.executed) {
+                    cmd.executed = true;
+                    cmd.lastExecuted = now.toISOString().slice(0, 19).replace('T', ' ');
+                    addLog('info', `✅ WYKONANO: ${cmd.command} o ${cmd.time}`);
+                    renderCommands();
+                    updateStats();
+                }
+            });
+        }
+
+        // Reset o północy
+        function checkMidnightReset() {
+            const now = new Date();
+            if (now.getHours() === 0 && now.getMinutes() === 0) {
+                commands.forEach(cmd => {
+                    cmd.executed = false;
+                });
+                addLog('info', '🌙 Reset o północy - wszystkie komendy gotowe do ponownego wykonania');
+                updateStats();
+                renderCommands();
+            }
+        }
+
+        // Inicjalizacja
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTime();
+            updateStats();
+            renderCommands();
+            renderLogs();
+
+            // Aktualizuj czas co sekundę
+            setInterval(updateTime, 1000);
+            
+            // Sprawdzaj wykonanie komend co minutę
+            setInterval(simulateExecution, 60000);
+            
+            // Sprawdzaj reset o północy co minutę
+            setInterval(checkMidnightReset, 60000);
+
+            // Przykładowy log startowy
+            addLog('info', 'CzasPlugin GUI uruchomiony');
+        });
+    </script>
+</body>
+</html>
