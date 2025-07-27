@@ -902,3 +902,252 @@
                 command: command,
                 status: status,
                 executed: false,
+                lastExecuted: null,
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                await saveCommand(newCommand);
+                
+                // Reset formularza
+                document.getElementById('new-command').value = '';
+                document.getElementById('new-time').value = '22:45';
+                document.getElementById('new-status').value = 'active';
+
+                addLog('info', `Dodano nową komendę: ${command} (${time})`);
+            } catch (error) {
+                alert('Błąd podczas dodawania komendy: ' + error.message);
+            }
+        }
+
+        async function testCommand(firebaseKey) {
+            const command = commands.find(cmd => cmd.firebaseKey === firebaseKey);
+            if (command) {
+                addLog('info', `[TEST] Wykonuję komendę: ${command.command}`);
+                alert(`Test komendy:\n${command.command}\n\nKomenda zostałaby wykonana o godzinie ${command.time}`);
+            }
+        }
+
+        async function editCommand(firebaseKey) {
+            const command = commands.find(cmd => cmd.firebaseKey === firebaseKey);
+            if (command) {
+                const newCommand = prompt('Edytuj komendę:', command.command);
+                const newTime = prompt('Edytuj godzinę (HH:MM):', command.time);
+                
+                if (newCommand !== null && newTime !== null && newCommand.trim() && newTime.trim()) {
+                    try {
+                        await updateCommand(firebaseKey, {
+                            command: newCommand.trim(),
+                            time: newTime.trim(),
+                            updatedAt: new Date().toISOString()
+                        });
+                        addLog('info', `Zaktualizowano komendę: ${newCommand.trim()}`);
+                    } catch (error) {
+                        alert('Błąd podczas aktualizacji: ' + error.message);
+                    }
+                }
+            }
+        }
+
+        async function toggleCommand(firebaseKey) {
+            const command = commands.find(cmd => cmd.firebaseKey === firebaseKey);
+            if (command) {
+                const newStatus = command.status === 'active' ? 'inactive' : 'active';
+                try {
+                    await updateCommand(firebaseKey, {
+                        status: newStatus,
+                        updatedAt: new Date().toISOString()
+                    });
+                    addLog('info', `Komenda "${command.command}" ${newStatus === 'active' ? 'włączona' : 'wyłączona'}`);
+                } catch (error) {
+                    alert('Błąd podczas zmiany statusu: ' + error.message);
+                }
+            }
+        }
+
+        async function removeCommand(firebaseKey) {
+            const command = commands.find(cmd => cmd.firebaseKey === firebaseKey);
+            if (command && confirm(`Czy na pewno chcesz usunąć komendę: "${command.command}"?`)) {
+                try {
+                    await deleteCommand(firebaseKey);
+                    addLog('warn', `Usunięto komendę: ${command.command}`);
+                } catch (error) {
+                    alert('Błąd podczas usuwania: ' + error.message);
+                }
+            }
+        }
+
+        async function addLog(level, message) {
+            const now = new Date();
+            const timeString = now.toISOString().slice(0, 19).replace('T', ' ');
+            const log = { 
+                time: timeString, 
+                level: level, 
+                message: message,
+                timestamp: now.getTime()
+            };
+            
+            try {
+                await saveLog(log);
+            } catch (error) {
+                console.error('Błąd podczas zapisywania logu:', error);
+            }
+        }
+
+        // Symulacja wykonywania komend w czasie rzeczywistym
+        async function simulateExecution() {
+            if (!isLoggedIn) return;
+            
+            const now = new Date();
+            const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+            
+            for (const cmd of commands) {
+                if (cmd.status === 'active' && cmd.time === currentTime && !cmd.executed) {
+                    try {
+                        await updateCommand(cmd.firebaseKey, {
+                            executed: true,
+                            lastExecuted: now.toISOString().slice(0, 19).replace('T', ' '),
+                            updatedAt: new Date().toISOString()
+                        });
+                        addLog('info', `✅ WYKONANO: ${cmd.command} o ${cmd.time}`);
+                    } catch (error) {
+                        addLog('error', `❌ BŁĄD podczas wykonywania: ${cmd.command} - ${error.message}`);
+                    }
+                }
+            }
+        }
+
+        // Reset o północy
+        async function checkMidnightReset() {
+            if (!isLoggedIn) return;
+            
+            const now = new Date();
+            if (now.getHours() === 0 && now.getMinutes() === 0) {
+                try {
+                    const resetPromises = commands.map(cmd => 
+                        updateCommand(cmd.firebaseKey, {
+                            executed: false,
+                            updatedAt: new Date().toISOString()
+                        })
+                    );
+                    await Promise.all(resetPromises);
+                    addLog('info', '🌙 Reset o północy - wszystkie komendy gotowe do ponownego wykonania');
+                } catch (error) {
+                    addLog('error', `❌ BŁĄD podczas resetu o północy: ${error.message}`);
+                }
+            }
+        }
+
+        // Plugin API simulation - for server integration
+        window.PluginAPI = {
+            // Function to be called by your Minecraft plugin
+            executeCommand: async function(commandText, scheduledTime) {
+                const command = commands.find(cmd => 
+                    cmd.command === commandText && cmd.time === scheduledTime
+                );
+                
+                if (command) {
+                    try {
+                        await updateCommand(command.firebaseKey, {
+                            executed: true,
+                            lastExecuted: new Date().toISOString().slice(0, 19).replace('T', ' '),
+                            updatedAt: new Date().toISOString()
+                        });
+                        addLog('info', `🎮 WYKONANO przez serwer: ${commandText}`);
+                        return { success: true, message: 'Komenda wykonana pomyślnie' };
+                    } catch (error) {
+                        addLog('error', `❌ BŁĄD serwera: ${error.message}`);
+                        return { success: false, message: error.message };
+                    }
+                }
+                return { success: false, message: 'Komenda nie znaleziona' };
+            },
+
+            // Get all active commands for the plugin
+            getActiveCommands: function() {
+                return commands.filter(cmd => cmd.status === 'active' && !cmd.executed);
+            },
+
+            // Add log from server
+            addServerLog: async function(level, message) {
+                await addLog(level, `🎮 ${message}`);
+            }
+        };
+
+        // Make functions globally available
+        window.addCommand = addCommand;
+        window.testCommand = testCommand;
+        window.editCommand = editCommand;
+        window.toggleCommand = toggleCommand;
+        window.removeCommand = removeCommand;
+        window.logout = logout;
+
+        // Initialize app after login
+        function initializeApp() {
+            updateTime();
+            
+            // Aktualizuj czas co sekundę
+            setInterval(updateTime, 1000);
+            
+            // Sprawdzaj wykonanie komend co minutę
+            setInterval(simulateExecution, 60000);
+            
+            // Sprawdzaj reset o północy co minutę
+            setInterval(checkMidnightReset, 60000);
+
+            addLog('info', 'CzasPlugin Panel Administratora uruchomiony');
+        }
+
+        // Check if user is already logged in (for development)
+        // In production, implement proper session management
+        
+    </script>
+
+    <!-- Instructions for server integration -->
+    <script>
+        // INSTRUKCJE DLA INTEGRACJI Z SERWEREM MINECRAFT:
+        // 
+        // 1. W swoim pluginie Java, możesz wykonać HTTP request do tej strony
+        // 2. Użyj JavaScript API dostępnego przez window.PluginAPI
+        // 3. Przykład integracji:
+        //
+        // Java (w pluginie):
+        // public void executeScheduledCommand(String command, String time) {
+        //     // HTTP POST request do Firebase API
+        //     // lub użyj Firebase Admin SDK
+        // }
+        //
+        // JavaScript (na stronie):
+        // window.PluginAPI.executeCommand("say Hello", "12:00");
+        //
+        // 4. Możesz także zintegrować Firebase bezpośrednio w Java:
+        //    - Dodaj Firebase Admin SDK do swojego pluginu
+        //    - Nasłuchuj zmian w bazie danych
+        //    - Wykonuj komendy automatycznie
+
+        console.log(`
+        🎮 INSTRUKCJE INTEGRACJI Z SERWEREM MINECRAFT:
+        
+        1. Firebase Configuration:
+           - Stwórz projekt na https://console.firebase.google.com
+           - Włącz Realtime Database
+           - Skopiuj konfigurację do firebaseConfig w kodzie
+           
+        2. Bezpieczeństwo:
+           - Skonfiguruj reguły bazy danych Firebase
+           - Używaj Firebase Auth dla lepszego bezpieczeństwa
+           - Zmień domyślne hasło administratora
+           
+        3. Integracja z pluginem:
+           - Użyj Firebase Admin SDK w Java
+           - Nasłuchuj zmian w /commands
+           - Wykonuj komendy o określonych godzinach
+           
+        4. API dostępne przez window.PluginAPI:
+           - executeCommand(commandText, scheduledTime)
+           - getActiveCommands()
+           - addServerLog(level, message)
+        `);
+    </script>
+</body>
+</html>
